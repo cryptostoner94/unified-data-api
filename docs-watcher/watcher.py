@@ -110,21 +110,43 @@ def _retry_after_seconds(resp) -> float | None:
         return None
 
 
+def _apply_api_key(url: str, ep: dict) -> tuple[str, dict]:
+    """Append API key from env to URL (api_key_param) and/or headers
+    (api_key_header) when the endpoint declares api_key_env."""
+    key_env = ep.get("api_key_env")
+    headers: dict = {}
+    if key_env:
+        key = os.environ.get(key_env, "")
+        if not key:
+            raise RuntimeError(f"endpoint {ep[id]}: {key_env} is not set")
+        param = ep.get("api_key_param")
+        if param:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{param}={key}"
+        header = ep.get("api_key_header")
+        if header:
+            headers[header] = key
+    return url, headers
+
+
 def http_get(url: str, timeout: float = DEFAULT_TIMEOUT_S,
-             min_interval_s: float = DEFAULT_MIN_INTERVAL_S):
+             min_interval_s: float = DEFAULT_MIN_INTERVAL_S,
+             headers: dict | None = None):
     """Single choke point for all outbound HTTP. Returns a requests.Response."""
     global _session
     if _session is None:
         _session = requests.Session()
         _session.headers.update(default_headers())
     _polite_wait(url, min_interval_s)
-    resp = _session.get(url, timeout=timeout, allow_redirects=True)
+    resp = _session.get(url, timeout=timeout, allow_redirects=True,
+                        headers=headers or None)
     if resp.status_code in (429, 503):
         wait = _retry_after_seconds(resp)
         if wait is not None:
             _sleep(wait)
             _polite_wait(url, min_interval_s)
-            resp = _session.get(url, timeout=timeout, allow_redirects=True)
+            resp = _session.get(url, timeout=timeout, allow_redirects=True,
+                                headers=headers or None)
     return resp
 
 
@@ -154,7 +176,10 @@ def check_liveness(ep: dict, defaults: dict) -> tuple[dict, list[str]]:
     """Check 1: GET the health-check URL; alert on non-2xx or slow response."""
     hc = ep["health_check"]
     url = hc["url"]
-    expect = hc.get("expect_status", 200)
+    # expect_status=None (or absent) means "any 2xx"; an explicit value
+    # (even non-2xx, e.g. 401 for keyed APIs) must match exactly.
+    expect = hc.get("expect_status")
+    url, _key_headers = _apply_api_key(url, ep)
     threshold = hc.get("latency_threshold_s",
                        defaults.get("latency_threshold_s", DEFAULT_LATENCY_THRESHOLD_S))
     timeout = defaults.get("timeout_s", DEFAULT_TIMEOUT_S)
@@ -163,17 +188,21 @@ def check_liveness(ep: dict, defaults: dict) -> tuple[dict, list[str]]:
     try:
         resp = http_get(url, timeout=timeout,
                         min_interval_s=ep.get("rate_limit_s",
-                                            defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)))
+                                            defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)),
+                        headers=_key_headers)
         result["_resp"] = resp  # internal: feeds check 4; stripped before reporting
         status = resp.status_code
         latency = _elapsed_s(resp)
         result.update({"status": status, "latency_ms": round(latency * 1000, 1)})
-        if not (200 <= status < 300):
+        if expect is None:
+            ok_status = 200 <= status < 300
+            want = "2xx"
+        else:
+            ok_status = status == expect
+            want = str(expect)
+        if not ok_status:
             alerts.append(
-                f"[liveness] {ep['id']}: HTTP {status} from {url} (expected {expect})")
-        elif expect is not None and status != expect:
-            alerts.append(
-                f"[liveness] {ep['id']}: HTTP {status} from {url} (expected {expect})")
+                f"[liveness] {ep['id']}: HTTP {status} from {url} (expected {want})")
         elif latency > threshold:
             alerts.append(
                 f"[liveness] {ep['id']}: slow response {latency:.1f}s > {threshold}s at {url}")
@@ -218,6 +247,26 @@ def _content_bytes(resp) -> bytes:
     return text.encode("utf-8", "replace")
 
 
+_CF_PARAMS_RE = re.compile(r"__CF\$cv\$params=\{[^}]*\}")
+_CF_EMAIL_RE = re.compile(r"/cdn-cgi/l/email-protection#[0-9a-fA-F]+")
+
+
+def _normalize_docs_html(content: bytes) -> bytes:
+    """Strip per-fetch nondeterministic artifacts before hashing docs pages.
+
+    Cloudflare injects a fresh challenge token (window.__CF$cv$params) and
+    per-fetch email-obfuscation hex on every response; hashing raw bytes
+    would flag a "change" on every run. Real doc edits still change the hash.
+    """
+    try:
+        text = content.decode("utf-8", "replace")
+    except Exception:
+        return content
+    text = _CF_PARAMS_RE.sub("__CF$cv$params={}", text)
+    text = _CF_EMAIL_RE.sub("/cdn-cgi/l/email-protection#", text)
+    return text.encode("utf-8", "replace")
+
+
 def check_docs(ep: dict, state: dict, defaults: dict):
     """Check 2: SHA-256 of docs page vs stored hash; keyword-scan on change."""
     url = ep["docs_url"]
@@ -228,7 +277,8 @@ def check_docs(ep: dict, state: dict, defaults: dict):
         resp = http_get(url, timeout=timeout,
                         min_interval_s=ep.get("rate_limit_s",
                                             defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)))
-        digest = hashlib.sha256(_content_bytes(resp)).hexdigest()
+        digest = hashlib.sha256(
+            _normalize_docs_html(_content_bytes(resp))).hexdigest()
         result["sha256"] = digest
         result["deprecation_headers"] = _deprecation_headers(resp)
         ep_state = state.setdefault("endpoints", {}).setdefault(ep["id"], {})
@@ -311,12 +361,14 @@ def check_schema(ep: dict, defaults: dict, sample_resp=None):
     if shape is None:
         return result, alerts
     url = ep.get("sample_url") or ep["health_check"]["url"]
+    url, _key_headers = _apply_api_key(url, ep)
     result["url"] = url
     try:
         resp = sample_resp if sample_resp is not None else http_get(
             url, timeout=defaults.get("timeout_s", DEFAULT_TIMEOUT_S),
             min_interval_s=ep.get("rate_limit_s",
-                                defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)))
+                                defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)),
+            headers=_key_headers)
         try:
             data = resp.json()
         except Exception as exc:
@@ -395,11 +447,19 @@ def check_staleness(ep: dict, state: dict, defaults: dict, now: float):
     cadence = feed["expected_cadence_s"]
     result.update({"url": url, "expected_cadence_s": cadence})
     try:
+        url, _key_headers = _apply_api_key(url, ep)
         resp = http_get(url, timeout=defaults.get("timeout_s", DEFAULT_TIMEOUT_S),
                         min_interval_s=ep.get("rate_limit_s",
-                                            defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)))
+                                            defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)),
+                        headers=_key_headers)
         data = resp.json()
-        newest = to_epoch(extract_path(data, feed["timestamp_path"]))
+        if "slot_path" in feed:
+            # Ethereum beacon slot -> epoch (genesis 1606824023, 12s slots)
+            slot = int(extract_path(data, feed["slot_path"]))
+            newest = 1606824023 + slot * 12
+            result["newest_slot"] = slot
+        else:
+            newest = to_epoch(extract_path(data, feed["timestamp_path"]))
         age = now - newest
         result.update({"newest_ts": newest,
                        "newest_iso": datetime.fromtimestamp(newest, tz=timezone.utc).isoformat(),
@@ -467,7 +527,7 @@ def validate_registry(registry: dict) -> list[str]:
                 problems.append(f"{where}: duplicate id '{eid}'")
             seen.add(eid)
         hc = ep.get("health_check") or {}
-        for key in ("method", "url", "expect_status"):
+        for key in ("method", "url"):
             if hc.get(key) is None:
                 problems.append(f"{where} ({eid}): health_check missing '{key}'")
         url = hc.get("url", "")
@@ -477,9 +537,11 @@ def validate_registry(registry: dict) -> list[str]:
             if ep.get(key) and not str(ep[key]).startswith(("http://", "https://", "wss://")):
                 problems.append(f"{where} ({eid}): {key} looks invalid: {ep[key]!r}")
         feed = ep.get("feed") or {}
-        for key in ("url", "timestamp_path", "expected_cadence_s"):
+        for key in ("url", "expected_cadence_s"):
             if "feed" in ep and not feed.get(key):
                 problems.append(f"{where} ({eid}): feed missing '{key}'")
+        if "feed" in ep and not feed.get("timestamp_path") and not feed.get("slot_path"):
+            problems.append(f"{where} ({eid}): feed needs 'timestamp_path' or 'slot_path'")
     return problems
 
 
