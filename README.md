@@ -40,6 +40,24 @@ const q = await sdk.crypto.cex.quote("BTCUSDT", { maxAge: 60 });
 console.log(q.price, q.freshness, q.source); // price is never shown as live when cached
 ```
 
+## Deploy (user's server)
+
+One-shot, idempotent — run as root on the target Ubuntu server. It installs
+Node 20 (if missing), clones/pulls to `/opt/unified-data-api`, runs `npm ci`,
+builds, runs the full offline test suite, and installs + enables systemd units
+for the API backend, the docs-watcher (daily full + hourly Tier-0 timers), and
+the landing page (nginx if present, else a static fallback).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cryptostoner94/unified-data-api/main/deploy.sh | sudo bash
+```
+
+Secrets come from `/opt/unified-data-api/.env`, created from
+`backend/.env.example` on first run only — fill in real values afterwards, then
+`systemctl restart unified-api`. To also publish `@unified-data/sdk` to npm
+during deploy: `export NPM_TOKEN=<token>` before running (read from the
+environment only, never written to disk).
+
 ## Honesty notes
 
 - Keyless public data stays direct and unmetered at the data layer; we meter at the license/bundle layer via heartbeat counts only — never queries, symbols, addresses, or locations.
