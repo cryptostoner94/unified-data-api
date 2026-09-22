@@ -1,0 +1,3 @@
+# Runtime deps for the docs-watcher runner (tests need pytest as well)
+requests>=2.31
+pyyaml>=6.0

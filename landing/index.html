@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified Public-Data API — one bundle, one interface, one bill</title>
+<meta name="description" content="A client-side SDK that bundles official public endpoints into normalized per-category bundles. Calls go direct from your machine.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <div class="brand">unified<span class="dot">.</span>data</div>
+    <nav class="nav-links">
+      <a href="#bundles">Bundles</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#code">Code</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Public data, without the plumbing</span>
+    <h1>One SDK. Every official public endpoint. Normalized.</h1>
+    <p class="lede">A client-side SDK that bundles platforms&rsquo; own public endpoints into typed, per-category bundles. Your calls go straight from your machine to the source &mdash; we never touch your data.</p>
+    <div class="asterisk-box">
+      <p>&ldquo;*All data is officially sourced from the platforms&rsquo; own public endpoints &mdash; our catalog mirrors the source truthfully. We sell convenience: one bundle, one interface, one bill, instead of hunting across platforms.*&rdquo;</p>
+    </div>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#install">Get the SDK</a>
+      <a class="btn btn-ghost" href="#bundles">Browse bundles</a>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="alt">
+  <div class="wrap">
+    <span class="eyebrow">How it works</span>
+    <h2>Three steps. No proxy. No key juggling.</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Install the SDK</h3>
+        <p>Drop in one package. Validate your license key once on init &mdash; that&rsquo;s the only call that ever reaches our servers.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Pick a bundle</h3>
+        <p>Choose the bundle for your job-to-be-done &mdash; MEV, CEX market data, SEC filings, macro stats. Every endpoint is typed and normalized.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Calls go direct from your machine</h3>
+        <p>Data requests go straight from your machine to the platforms&rsquo; public endpoints. Rate limits stay per-user, exactly as if you went direct &mdash; we never see your data.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BUNDLES -->
+<section id="bundles">
+  <div class="wrap">
+    <span class="eyebrow">Phase 1 &mdash; available now</span>
+    <h2>Six bundles, ready to install</h2>
+    <p class="lede">Each bundle is the platform&rsquo;s own official public endpoint, normalized into a single typed interface &mdash; so you never visit ten doc sites to get started.</p>
+    <div class="bundle-grid">
+
+      <div class="bundle">
+        <div class="tag">Crypto &middot; MEV</div>
+        <h3>MEV bundle</h3>
+        <ul>
+          <li><strong>Mempool transactions</strong> &mdash; pending-tx and block data from mempool.space</li>
+          <li><strong>Relay bid traces</strong> &mdash; builder bids and payload deliveries via MEV-Boost relays</li>
+          <li><strong>Pending-tx feeds</strong> &mdash; unconfirmed transaction streams</li>
+        </ul>
+        <p class="src">Sources: mempool.space, Flashbots / Ultrasound / bloXroute relays, blockchain.info</p>
+      </div>
+
+      <div class="bundle">
+        <div class="tag">Crypto &middot; Resolver</div>
+        <h3>Resolver bundle</h3>
+        <ul>
+          <li><strong>Swap quotes</strong> &mdash; 1inch quotes and orderbooks (your own API key required)</li>
+          <li><strong>DEX fills</strong> &mdash; on-chain execution data via The Graph subgraphs</li>
+          <li><strong>Order books</strong> &mdash; keyless depth from major venues</li>
+        </ul>
+        <p class="src">Sources: 1inch (gated), The Graph, Binance, Kraken</p>
+      </div>
+
+      <div class="bundle">
+        <div class="tag">Crypto &middot; Market data</div>
+        <h3>CEX market-data bundle</h3>
+        <ul>
+          <li><strong>Klines</strong> &mdash; OHLC candles at any interval</li>
+          <li><strong>Tickers</strong> &mdash; live price snapshots across spot pairs</li>
+          <li><strong>Trades</strong> &mdash; recent trade history streams</li>
+        </ul>
+        <p class="src">Sources: Binance (market-data-only endpoint), Kraken</p>
+      </div>
+
+      <div class="bundle">
+        <div class="tag">Crypto &middot; Tokens</div>
+        <h3>DEX / token bundle</h3>
+        <ul>
+          <li><strong>Token prices</strong> &mdash; spot prices across DEXes</li>
+          <li><strong>Pair data</strong> &mdash; liquidity and 24h volume per pair</li>
+          <li><strong>Token metadata</strong> &mdash; names, symbols, chain, contract addresses</li>
+        </ul>
+        <p class="src">Sources: DEX Screener, GeckoTerminal, CoinGecko &amp; Etherscan (gated, your own key)</p>
+      </div>
+
+      <div class="bundle">
+        <div class="tag">Crypto &middot; Wallets</div>
+        <h3>Wallet / labels bundle</h3>
+        <ul>
+          <li><strong>Address history</strong> &mdash; transactions for any address</li>
+          <li><strong>Balances</strong> &mdash; confirmed and pending balances</li>
+          <li><strong>Label adapters</strong> &mdash; bring-your-own-key adapters for paid label datasets</li>
+        </ul>
+        <p class="src">Sources: blockchain.info, mempool.space (keyless-first)</p>
+      </div>
+
+      <div class="bundle featured">
+        <div class="tag">Enterprise &middot; Fortune 500</div>
+        <h3>Enterprise bundle</h3>
+        <ul>
+          <li><strong>SEC EDGAR</strong> &mdash; company filings, submissions, and XBRL financial facts</li>
+          <li><strong>Macro statistics</strong> &mdash; FRED series, BLS labor data, US Census demographics</li>
+          <li><strong>Patents</strong> &mdash; full-text patent search via USPTO and EPO</li>
+          <li><strong>Company registries</strong> &mdash; UK Companies House, GLEIF LEI records, OpenCorporates</li>
+        </ul>
+        <p class="src">Sources: SEC, FRED, BLS, Census, USPTO, Companies House, GLEIF, OpenCorporates, EPO</p>
+      </div>
+
+    </div>
+    <p class="code-note" style="margin-top:24px;">Later-phase verticals &mdash; weather, travel, news, maps, sports, feeds &mdash; are on the roadmap and <strong>not available yet</strong>.</p>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="alt" id="install">
+  <div class="wrap">
+    <span class="eyebrow">Get started</span>
+    <h2>One install</h2>
+    <div class="install-row">
+      <pre><code>npm install @unified-data/sdk</code></pre>
+      <span class="copy-hint">TypeScript-first. Python package <code>unified-data</code> mirrors the bundle surface.</span>
+    </div>
+    <div class="honest-note">
+      Package publishing in progress &mdash; the package is not yet live on npm. Source available on GitHub: <a href="https://github.com/cryptostoner94/unified-data-api" style="color:var(--amber);">github.com/cryptostoner94/unified-data-api</a>.
+    </div>
+  </div>
+</section>
+
+<!-- CODE -->
+<section id="code">
+  <div class="wrap">
+    <span class="eyebrow">Developer experience</span>
+    <h2>Typed. Cached. Freshness-enforced.</h2>
+    <p class="lede">Every result carries its source, fetch time, and a freshness label. Ask for a max age &mdash; if no result is fresh enough, the SDK tells you instead of silently returning stale data.</p>
+    <pre><code><span class="k">import</span> { UnifiedData } <span class="k">from</span> <span class="s">"@unified-data/sdk"</span>;
+
+<span class="k">const</span> sdk = <span class="k">new</span> <span class="f">UnifiedData</span>({ licenseKey: process.env.UNIFIED_DATA_KEY });
+
+<span class="c">// Quote BTC/USDT, refusing anything older than 60 seconds</span>
+<span class="k">const</span> quote = <span class="k">await</span> sdk.crypto.cex.<span class="f">quote</span>(<span class="s">"BTCUSDT"</span>, { maxAge: <span class="n">60</span> });
+
+console.<span class="f">log</span>(quote.price);      <span class="c">// 97,412.55</span>
+console.<span class="f">log</span>(quote.source);     <span class="c">// "binance"</span>
+console.<span class="f">log</span>(quote.freshness);  <span class="c">// "LIVE" — fetched on demand, seconds old</span></code></pre>
+    <p class="code-note">Ask for a <code>maxAge</code> and the SDK throws <code>StaleData</code> (with the last fetch time) rather than handing you an old number. Freshness labels are on by default &mdash; hiding one is an explicit opt-out.</p>
+  </div>
+</section>
+
+<!-- FRESHNESS -->
+<section class="alt">
+  <div class="wrap">
+    <span class="eyebrow">Freshness promise</span>
+    <h2>Minutes, not days</h2>
+    <p class="lede">Every result is labeled. A price is never presented as live when it is cached &mdash; we treat that as a defect, not a feature.</p>
+    <div class="fresh-strip">
+      <div class="fresh-card fresh-live">
+        <span class="fresh-label">LIVE</span>
+        <p>Fetched on demand from the upstream in this call &mdash; or pushed over an active stream within the last few seconds.</p>
+      </div>
+      <div class="fresh-card fresh-cached">
+        <span class="fresh-label">CACHED</span>
+        <p>Served from the SDK cache. The exact age travels with the result, so you always know how old it is.</p>
+      </div>
+      <div class="fresh-card fresh-estimate">
+        <span class="fresh-label">ESTIMATE</span>
+        <p>A derived or indicative value &mdash; never a firm quote. Never displayed as a price without the label attached.</p>
+      </div>
+    </div>
+    <div class="fresh-rule">
+      Price bundles default to a 2-minute max age: live quotes are fetched on demand and never silently served older than 120 seconds unless you explicitly allow caching.
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="wrap">
+    <span class="eyebrow">Pricing</span>
+    <h2>One bill for everything</h2>
+    <p class="lede">You pay for the bundle and the convenience &mdash; never per upstream, never a key-management headache.</p>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Free</h3>
+        <div class="price"><span class="tbd">TBD</span></div>
+        <ul>
+          <li>Keyless bundles included</li>
+          <li>Heartbeat-metered, generous but bounded (e.g. 10K bundle calls/day)</li>
+          <li>Enough to build and ship a side project</li>
+          <li>Community support</li>
+        </ul>
+      </div>
+      <div class="tier popular">
+        <h3>Builder</h3>
+        <div class="price"><span class="tbd">TBD</span></div>
+        <ul>
+          <li>All keyless + free-key bundles</li>
+          <li>Higher heartbeat quota</li>
+          <li>Docs-watcher change alerts</li>
+          <li>Email support</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <h3>Pro</h3>
+        <div class="price"><span class="tbd">TBD</span></div>
+        <ul>
+          <li>Everything in Builder</li>
+          <li>GATED-bundle helpers (you still bring your own keys)</li>
+          <li>Approval-tier onboarding assistance</li>
+          <li>SLA on SDK fixes</li>
+        </ul>
+      </div>
+      <div class="tier">
+        <h3>Enterprise</h3>
+        <div class="price"><span class="tbd">TBD</span></div>
+        <ul>
+          <li>Pooled paid upstream keys via proxied tiers</li>
+          <li>Custom bundles</li>
+          <li>Full SLA</li>
+        </ul>
+      </div>
+    </div>
+    <p class="code-note">Final pricing is still being set. Keyless public data stays direct and unmetered at the data layer &mdash; we meter at the license/bundle layer via the heartbeat.</p>
+  </div>
+</section>
+
+<!-- PRIVACY -->
+<section class="alt">
+  <div class="wrap">
+    <span class="eyebrow">Privacy</span>
+    <h2>The heartbeat is counts only</h2>
+    <div class="privacy-box">
+      <p>Metering works through a lightweight license-key validation plus a usage heartbeat to our server. It is the <strong>only</strong> traffic that touches our infrastructure, and it carries <strong>counts only</strong>:</p>
+      <ul>
+        <li>Aggregated call counts per bundle &mdash; e.g. <code>"crypto.cex": 842</code></li>
+        <li>SDK version and platform</li>
+      </ul>
+      <p style="margin-top:14px;"><strong>Never sent:</strong> query parameters, symbols searched, addresses looked up, locations, or any user data. The heavy data never touches our servers &mdash; that&rsquo;s the trust contract.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="footnote">
+      *All data is officially sourced from the platforms&rsquo; own public endpoints &mdash; our catalog mirrors the source truthfully. We sell convenience: one bundle, one interface, one bill, instead of hunting across platforms.
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/cryptostoner94/unified-data-api">GitHub: github.com/cryptostoner94/unified-data-api</a>
+      <a href="mailto:[owner email]">Contact: [owner email]</a>
+    </div>
+    <p>All data is &copy; its respective platforms. We resell no data &mdash; the SDK bundles official public endpoints and calls them from your machine.</p>
+  </div>
+</footer>
+
+</body>
+</html>

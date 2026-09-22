@@ -1,0 +1,372 @@
+# Unified public-data API — docs-watcher endpoint registry (PHASE 1)
+# Covers spec §2.1 (crypto catalog) and §2.2 (enterprise catalog) only.
+# Base URLs are taken verbatim from the spec; docs URLs are the official
+# documentation pages named in the spec (see `notes` where the docs page is
+# the provider's API landing rather than a dedicated docs article).
+# Conventions:
+#   tier: "tier0" = hourly Tier-0 crypto subset (--tier0); "standard" = daily full run
+#   health_check: cheap, read-only GET. WS endpoints use their official docs
+#     page as the health check (no cheap unauthenticated WS handshake exists).
+#   expected_shape: minimal response-shape guard for schema-drift detection.
+#     `type` may be a single type name or a list of allowed type names.
+#     Types: string, integer, number, boolean, array, object, null, any.
+#   feed: staleness monitoring (§7.4). `timestamp_path` is a dotted path into the
+#     JSON sample; numeric segments index arrays ("-1" = last, "*" = first value).
+
+version: 1
+
+defaults:
+  timeout_s: 20
+  latency_threshold_s: 10.0
+  min_interval_s: 1.0   # per-host minimum gap between requests (politeness)
+
+endpoints:
+
+  # ---------------------------------------------------------------- crypto (§2.1)
+  - id: mempool-rest
+    bundle: crypto
+    name: mempool.space REST
+    base_url: https://mempool.space/api
+    docs_url: https://mempool.space/docs/api/rest
+    tier: tier0
+    health_check:
+      method: GET
+      url: https://mempool.space/api/blocks/tip/height
+      expect_status: 200
+    expected_shape:
+      type: number
+    feed:
+      url: https://mempool.space/api/blocks
+      timestamp_path: "0.timestamp"
+      expected_cadence_s: 600
+    notes: "Cheap canonical call per spec. Block timestamps (unix seconds) drive staleness."
+
+  - id: mempool-ws
+    bundle: crypto
+    name: mempool.space WebSocket
+    base_url: wss://mempool.space/api/v1/ws
+    docs_url: https://mempool.space/docs/api/websocket
+    tier: standard
+    health_check:
+      method: GET
+      url: https://mempool.space/docs/api/websocket
+      expect_status: 200
+    notes: "WS endpoint — liveness is checked via its official docs page (read-only)."
+
+  - id: flashbots-relay
+    bundle: crypto
+    name: Flashbots MEV-Boost relay data API
+    base_url: https://boost-relay.flashbots.net
+    docs_url: https://docs.flashbots.net/flashbots-mev-boost/architecture-overview/specifications
+    tier: standard
+    health_check:
+      method: GET
+      url: https://boost-relay.flashbots.net/relay/v1/data/bidtraces/proposer_payload_delivered
+      expect_status: 200
+    expected_shape:
+      type: array
+      item:
+        type: object
+        fields:
+          slot: {type: [string, integer]}
+          builder_pubkey: {type: string}
+    feed:
+      url: https://boost-relay.flashbots.net/relay/v1/data/bidtraces/proposer_payload_delivered
+      timestamp_path: "0.timestamp"
+      expected_cadence_s: 3600
+    notes: "Keyless data API. Timestamp is unix seconds (string or number)."
+
+  - id: ultrasound-relay
+    bundle: crypto
+    name: Ultrasound MEV-Boost relay data API
+    base_url: https://relay.ultrasound.money
+    docs_url: https://relay.ultrasound.money
+    tier: standard
+    health_check:
+      method: GET
+      url: https://relay.ultrasound.money/relay/v1/data/bidtraces/proposer_payload_delivered
+      expect_status: 200
+    expected_shape:
+      type: array
+      item:
+        type: object
+        fields:
+          slot: {type: [string, integer]}
+          builder_pubkey: {type: string}
+    notes: "docs_url is the relay's official landing page (data API mirrors mev-boost-relay spec)."
+
+  - id: bloxroute-relay
+    bundle: crypto
+    name: bloXroute max-profit relay data API
+    base_url: https://bloxroute.max-profit.blxrbdn.com
+    docs_url: https://docs.bloxroute.com
+    tier: standard
+    health_check:
+      method: GET
+      url: https://bloxroute.max-profit.blxrbdn.com/relay/v1/data/bidtraces/proposer_payload_delivered
+      expect_status: 200
+    expected_shape:
+      type: array
+      item:
+        type: object
+        fields:
+          slot: {type: [string, integer]}
+          builder_pubkey: {type: string}
+    notes: "docs_url is the official bloXroute docs site."
+
+  - id: blockchain-info-ws
+    bundle: crypto
+    name: blockchain.info WebSocket
+    base_url: wss://ws.blockchain.info/inv
+    docs_url: https://www.blockchain.com/api/websocket_api
+    tier: standard
+    health_check:
+      method: GET
+      url: https://www.blockchain.com/api/websocket_api
+      expect_status: 200
+    notes: "WS endpoint (unconfirmed_sub, blocks_sub) — liveness via official WS docs page."
+
+  - id: 1inch-devportal
+    bundle: crypto
+    name: 1inch DevPortal (Swap API docs)
+    base_url: https://api.1inch.dev
+    docs_url: https://portal.1inch.dev/documentation
+    tier: standard
+    health_check:
+      method: GET
+      url: https://portal.1inch.dev/documentation
+      expect_status: 200
+    notes: "GATED (end user supplies key); API itself is keyed so docs page is the health check."
+
+  - id: binance-dataapi
+    bundle: crypto
+    name: Binance market-data REST (data-api)
+    base_url: https://data-api.binance.vision
+    docs_url: https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints
+    tier: tier0
+    health_check:
+      method: GET
+      url: https://data-api.binance.vision/api/v3/ping
+      expect_status: 200
+    expected_shape:
+      type: object
+    feed:
+      url: https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=1
+      timestamp_path: "0.0"
+      expected_cadence_s: 60
+    notes: "ping returns {}. Kline open time is unix ms."
+
+  - id: binance-ws
+    bundle: crypto
+    name: Binance market-data WebSocket
+    base_url: wss://data-stream.binance.vision
+    docs_url: https://developers.binance.com/docs/binance-spot-api-docs/web-socket-api
+    tier: standard
+    health_check:
+      method: GET
+      url: https://developers.binance.com/docs/binance-spot-api-docs/web-socket-api
+      expect_status: 200
+    notes: "WS endpoint — liveness via official WS docs page."
+
+  - id: kraken-rest
+    bundle: crypto
+    name: Kraken REST
+    base_url: https://api.kraken.com/0/public
+    docs_url: https://docs.kraken.com/api/docs/rest-api
+    tier: tier0
+    health_check:
+      method: GET
+      url: https://api.kraken.com/0/public/Time
+      expect_status: 200
+    expected_shape:
+      type: object
+      fields:
+        error: {type: array}
+        result: {type: object}
+    feed:
+      url: https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1
+      timestamp_path: "result.*.-1.0"
+      expected_cadence_s: 60
+    notes: "OHLC candle open time is unix seconds; '*' picks the (single) pair key."
+
+  - id: kraken-ws-v2
+    bundle: crypto
+    name: Kraken WebSocket v2
+    base_url: wss://ws.kraken.com/v2
+    docs_url: https://docs.kraken.com/api/docs/websocket-v2
+    tier: standard
+    health_check:
+      method: GET
+      url: https://docs.kraken.com/api/docs/websocket-v2
+      expect_status: 200
+    notes: "WS endpoint — liveness via official WS v2 docs page."
+
+  - id: thegraph-docs
+    bundle: crypto
+    name: The Graph docs (gateway)
+    base_url: https://gateway.thegraph.com
+    docs_url: https://thegraph.com/docs/en/
+    tier: standard
+    health_check:
+      method: GET
+      url: https://thegraph.com/docs/en/
+      expect_status: 200
+    notes: "GATED (Subgraph Studio key); gateway is keyed so docs page is the health check."
+
+  - id: dexscreener
+    bundle: crypto
+    name: DEX Screener API
+    base_url: https://api.dexscreener.com
+    docs_url: https://docs.dexscreener.com
+    tier: standard
+    health_check:
+      method: GET
+      url: https://api.dexscreener.com/token-boosts/top/v1
+      expect_status: 200
+    expected_shape:
+      type: array
+    notes: "Keyless. token-boosts/top is a cheap canonical call."
+
+  - id: geckoterminal
+    bundle: crypto
+    name: GeckoTerminal API
+    base_url: https://api.geckoterminal.com/api/v2
+    docs_url: https://www.geckoterminal.com/dex-api
+    tier: standard
+    health_check:
+      method: GET
+      url: https://api.geckoterminal.com/api/v2/networks
+      expect_status: 200
+    expected_shape:
+      type: array
+    notes: "Keyless, 30 calls/min official FAQ — watcher stays far below that."
+
+  # ------------------------------------------------------------ enterprise (§2.2)
+  - id: sec-edgar
+    bundle: enterprise
+    name: SEC EDGAR filings & submissions
+    base_url: https://data.sec.gov
+    docs_url: https://www.sec.gov/search-filings/edgar-application-programming-interfaces
+    tier: standard
+    rate_limit_s: 0.5
+    health_check:
+      method: GET
+      url: https://www.sec.gov/files/company_tickers.json
+      expect_status: 200
+    expected_shape:
+      type: object
+    notes: "Cheap canonical call per spec. SEC requires a descriptive User-Agent (we send one)."
+
+  - id: bls
+    bundle: enterprise
+    name: BLS Public Data API
+    base_url: https://api.bls.gov/publicAPI/v2
+    docs_url: https://www.bls.gov/developers/api_signature_v2.htm
+    tier: standard
+    health_check:
+      method: GET
+      url: https://www.bls.gov/developers/api_signature_v2.htm
+      expect_status: 200
+    notes: "Real API calls need POST; docs page is the read-only health check."
+
+  - id: census
+    bundle: enterprise
+    name: US Census API
+    base_url: https://api.census.gov/data
+    docs_url: https://www.census.gov/data/developers.html
+    tier: standard
+    health_check:
+      method: GET
+      url: "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=us:1"
+      expect_status: 200
+    expected_shape:
+      type: array
+    notes: "Keyless single-variable national query — cheap and read-only."
+
+  - id: fred
+    bundle: enterprise
+    name: FRED API docs
+    base_url: https://api.stlouisfed.org/fred
+    docs_url: https://fred.stlouisfed.org/docs/api/fred
+    tier: standard
+    health_check:
+      method: GET
+      url: https://fred.stlouisfed.org/docs/api/fred
+      expect_status: 200
+    notes: "API itself needs a key; official API docs page is the health check."
+
+  - id: uspto-odp
+    bundle: enterprise
+    name: USPTO Open Data Portal
+    base_url: https://api.uspto.gov
+    docs_url: https://developer.uspto.gov
+    tier: standard
+    health_check:
+      method: GET
+      url: https://developer.uspto.gov
+      expect_status: 200
+    notes: "API needs X-API-KEY; developer portal is the read-only health check."
+
+  - id: uspto-tsdr
+    bundle: enterprise
+    name: USPTO TSDR (trademarks)
+    base_url: https://tsdrapi.uspto.gov
+    docs_url: https://tsdrapi.uspto.gov
+    tier: standard
+    health_check:
+      method: GET
+      url: https://tsdrapi.uspto.gov
+      expect_status: 200
+    notes: "API needs USPTO-API-KEY; the API landing page doubles as docs/health check."
+
+  - id: companies-house
+    bundle: enterprise
+    name: UK Companies House API docs
+    base_url: https://api.company-information.service.gov.uk
+    docs_url: https://developer.company-information.service.gov.uk
+    tier: standard
+    health_check:
+      method: GET
+      url: https://developer.company-information.service.gov.uk
+      expect_status: 200
+    notes: "API needs a key (HTTP Basic); developer hub is the read-only health check."
+
+  - id: gleif
+    bundle: enterprise
+    name: GLEIF LEI API
+    base_url: https://api.gleif.org/api/v1
+    docs_url: https://www.gleif.org/lei-data/access-it-via-web-service/gleif-api
+    tier: standard
+    health_check:
+      method: GET
+      url: https://api.gleif.org/api/v1/lei-records?per-page=1
+      expect_status: 200
+    expected_shape:
+      type: object
+      fields:
+        data: {type: array}
+    notes: "Keyless, CC0. Single-record query is the cheap canonical call."
+
+  - id: opencorporates
+    bundle: enterprise
+    name: OpenCorporates API docs
+    base_url: https://api.opencorporates.com/v0.4
+    docs_url: https://api.opencorporates.com/documentation/API-Reference-Intro
+    tier: standard
+    health_check:
+      method: GET
+      url: https://api.opencorporates.com/documentation/API-Reference-Intro
+      expect_status: 200
+    notes: "API needs a token; official API reference is the read-only health check."
+
+  - id: epo-ops
+    bundle: enterprise
+    name: EPO Open Patent Services docs
+    base_url: https://ops.epo.org/3.2/rest-services
+    docs_url: https://www.epo.org/searching-for-patents/data/web-services/ops
+    tier: standard
+    health_check:
+      method: GET
+      url: https://www.epo.org/searching-for-patents/data/web-services/ops
+      expect_status: 200
+    notes: "API needs OAuth consumer key+secret; OPS docs page is the read-only health check."

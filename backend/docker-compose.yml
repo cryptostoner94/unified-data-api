@@ -1,0 +1,32 @@
+# Local / staging deploy: API + Postgres. SQLite is the default when
+# DATABASE_URL is unset — Postgres is optional.
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Uncomment to use Postgres instead of SQLite:
+      # DATABASE_URL: postgresql://dataapi:${POSTGRES_PASSWORD}@db:5432/dataapi
+      SQLITE_PATH: /srv/data-api/data/metering.db
+    volumes:
+      - api-data:/srv/data-api/data
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dataapi
+      POSTGRES_USER: dataapi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  api-data:
+  pg-data:

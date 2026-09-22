@@ -1,0 +1,12 @@
+export { RestAdapter, PollingAdapter } from "./rest.js";
+export type { PollFetchResult, PollingEvents, PollingAdapterOptions, PollingHealth, RestAdapterOptions } from "./rest.js";
+export { StreamAdapter } from "./ws.js";
+export type { StreamAdapterOptions, StreamEvent, StreamEvents, StreamHealth, WebSocketFactory, WebSocketLike } from "./ws.js";
+export { BinaryAdapter, unconfiguredDecoder } from "./gtfs.js";
+export type { BinaryAdapterOptions, BinaryHealth, GtfsRtDecoder, GtfsRtEntity, GtfsRtEntityType } from "./gtfs.js";
+export { ICalAdapter, parseICal, parseICalDate, normalizeICalEvents } from "./ical.js";
+export type { ICalAdapterOptions, RawICalEvent } from "./ical.js";
+export { RssAdapter, parseFeedXml, normalizeFeedItems } from "./rss.js";
+export type { RssAdapterOptions, RawFeedItem } from "./rss.js";
+export { DatasetAdapter } from "./dataset.js";
+export type { DatasetAdapterOptions, PageResult } from "./dataset.js";
