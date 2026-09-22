@@ -1,5 +1,5 @@
 /**
- * @unified-data/sdk — client-side TypeScript SDK for the Unified Public-Data API.
+ * @cryptostoner/sdk — client-side TypeScript SDK for the Unified Public-Data API.
  *
  * Bundles PUBLIC endpoints into normalized per-category bundles. Data calls go
  * DIRECT from the end user's machine to the public endpoints — no server proxy.

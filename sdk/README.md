@@ -1,4 +1,4 @@
-# @unified-data/sdk
+# @cryptostoner/sdk
 
 Client-side TypeScript SDK for the Unified Public-Data API product.
 
@@ -21,7 +21,7 @@ sports bundles are **roadmap** — not implemented here.
 ## Install
 
 ```bash
-npm install @unified-data/sdk
+npm install @cryptostoner/sdk
 ```
 
 Requires Node 18+ (or any runtime with `fetch`; `WebSocket` only needed for streaming).
@@ -29,7 +29,7 @@ Requires Node 18+ (or any runtime with `fetch`; `WebSocket` only needed for stre
 ## Quickstart
 
 ```ts
-import { UnifiedDataSDK } from "@unified-data/sdk";
+import { UnifiedDataSDK } from "@cryptostoner/sdk";
 
 const sdk = await UnifiedDataSDK.create({
   licenseKey: process.env.UNIFIED_DATA_LICENSE_KEY!,
@@ -147,7 +147,7 @@ Every normalized result carries `source`, `fetchedAt`, and `freshness`:
 freshness label by default; hiding it requires the explicit opt-out:
 
 ```ts
-import { formatPrice } from "@unified-data/sdk";
+import { formatPrice } from "@cryptostoner/sdk";
 formatPrice(67000.5, { currency: "$", freshness: q.freshness }); // "$67,000.50 (LIVE)"
 formatPrice(67000.5, { freshness: "CACHED", hideFreshness: true }); // explicit opt-out
 ```
