@@ -62,7 +62,7 @@ endpoints:
   bundle: crypto
   name: Ultrasound MEV-Boost relay data API
   base_url: https://relay.ultrasound.money
-  docs_url: https://relay.ultrasound.money
+  docs_url: https://raw.githubusercontent.com/ultrasoundmoney/relay-docs/main/builders/data-api.md
   tier: standard
   health_check:
     method: GET
@@ -79,17 +79,16 @@ endpoints:
           - integer
         builder_pubkey:
           type: string
-  notes: docs_url is the relay's official landing page (data API mirrors mev-boost-relay
-    spec).
+  notes: docs_url is the official relay-docs data-API page (raw markdown, stable). The relay homepage is a live dashboard with per-block counters, unsuitable for change detection.
 - id: bloxroute-relay
   bundle: crypto
-  name: bloXroute max-profit relay data API
-  base_url: https://bloxroute.max-profit.blxrbdn.com
+  name: bloXroute regulated relay data API
+  base_url: https://bloxroute.regulated.blxrbdn.com
   docs_url: https://docs.bloxroute.com
   tier: standard
   health_check:
     method: GET
-    url: https://bloxroute.max-profit.blxrbdn.com/relay/v1/data/bidtraces/proposer_payload_delivered
+    url: https://bloxroute.regulated.blxrbdn.com/relay/v1/data/bidtraces/proposer_payload_delivered
     expect_status: 200
   expected_shape:
     type: array
@@ -102,12 +101,12 @@ endpoints:
           - integer
         builder_pubkey:
           type: string
-  notes: docs_url is the official bloXroute docs site.
+  notes: max-profit relay DNS is decommissioned (NXDOMAIN); switched to the live regulated relay.
 - id: blockchain-info-ws
   bundle: crypto
   name: blockchain.info WebSocket
   base_url: wss://ws.blockchain.info/inv
-  docs_url: https://www.blockchain.com/api/websocket_api
+  docs_url: https://www.blockchain.com/explorer/api/websocket_api
   tier: standard
   health_check:
     method: GET

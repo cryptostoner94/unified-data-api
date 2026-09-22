@@ -49,6 +49,40 @@ DEFAULT_LATENCY_THRESHOLD_S = 10.0
 DEFAULT_MIN_INTERVAL_S = 1.0
 MAX_RETRY_AFTER_S = 60
 
+def _load_dotenv() -> None:
+    """Load ../.env (sibling of the repo root) for vars not already set.
+
+    Keeps manual runs identical to the systemd timer run (which uses
+    EnvironmentFile). Tiny parser: skips blanks/comments, splits on the first
+    "=", tolerates the shell-unsafe LICENSE_KEYS placeholder line — the watcher
+    only needs the *_API_KEY entries.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    for cand in (os.path.join(here, "..", ".env"), os.path.join(here, ".env")):
+        path = os.path.normpath(cand)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    if not key or not key.replace("_", "").isalnum() or key in os.environ:
+                        continue
+                    val = val.strip()
+                    if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+                        val = val[1:-1]
+                    os.environ[key] = val
+        except OSError:
+            pass
+
+
+_load_dotenv()
+
+
 DEPRECATION_KEYWORDS = [
     "deprecat", "sunset", "end-of-life", "end of life", "breaking change",
     "removed", "retired", "no longer", "migrat", "legacy",
@@ -118,7 +152,7 @@ def _apply_api_key(url: str, ep: dict) -> tuple[str, dict]:
     if key_env:
         key = os.environ.get(key_env, "")
         if not key:
-            raise RuntimeError(f"endpoint {ep[id]}: {key_env} is not set")
+            raise RuntimeError(f"endpoint {ep['id']}: {key_env} is not set")
         param = ep.get("api_key_param")
         if param:
             sep = "&" if "?" in url else "?"
@@ -247,24 +281,50 @@ def _content_bytes(resp) -> bytes:
     return text.encode("utf-8", "replace")
 
 
-_CF_PARAMS_RE = re.compile(r"__CF\$cv\$params=\{[^}]*\}")
-_CF_EMAIL_RE = re.compile(r"/cdn-cgi/l/email-protection#[0-9a-fA-F]+")
+_USPTO_REQID_RE = re.compile(r"\[[0-9a-f]{16}-[0-9a-f]{4,16}\]")
 
 
-def _normalize_docs_html(content: bytes) -> bytes:
-    """Strip per-fetch nondeterministic artifacts before hashing docs pages.
+def _docs_fingerprint(html: str) -> str:
+    """Stable fingerprint of a docs page for change detection.
 
-    Cloudflare injects a fresh challenge token (window.__CF$cv$params) and
-    per-fetch email-obfuscation hex on every response; hashing raw bytes
-    would flag a "change" on every run. Real doc edits still change the hash.
+    Uses visible prose (scripts/styles/tags stripped) rather than raw markup,
+    so per-fetch Cloudflare artifacts (challenge scripts, data-cfemail
+    obfuscation tokens) don't trigger false "changed" alerts. Plain-text
+    request IDs (e.g. USPTO's `[000001a003b8b318-...]` notice suffix) are
+    neutralized. Trade-off: pure hyperlink-URL changes without prose changes
+    won't flip the hash — acceptable for a docs watchdog.
     """
-    try:
-        text = content.decode("utf-8", "replace")
-    except Exception:
-        return content
-    text = _CF_PARAMS_RE.sub("__CF$cv$params={}", text)
-    text = _CF_EMAIL_RE.sub("/cdn-cgi/l/email-protection#", text)
-    return text.encode("utf-8", "replace")
+    visible = _visible_text(html)
+    visible = _USPTO_REQID_RE.sub("[request-id]", visible)
+    return hashlib.sha256(visible.encode("utf-8", "replace")).hexdigest()
+
+
+_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)[^>]*>.*?</\1>")
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _visible_text(html: str) -> str:
+    """Strip scripts, styles and tags: keyword scans must see prose, not JS/CSS.
+
+    Without this, tokens like `legacyPageName` (analytics JS) or `migration`
+    (CSS class names) trigger false deprecation alerts.
+    """
+    text = _SCRIPT_STYLE_RE.sub(" ", html)
+    text = _TAG_RE.sub(" ", text)
+    return _WS_RE.sub(" ", text).strip()
+
+
+def _keyword_hits(visible: str) -> list:
+    """Deprecation keywords matched on word boundaries (case-insensitive)."""
+    low = visible.lower()
+    hits = []
+    # Left word-boundary only: keywords are stems ("migrat" must match
+    # "migrate"/"migration"), but must not match mid-word ("unremoved").
+    for kw in DEPRECATION_KEYWORDS:
+        if re.search(r"(?<![a-z0-9])" + re.escape(kw), low):
+            hits.append(kw)
+    return sorted(hits)
 
 
 def check_docs(ep: dict, state: dict, defaults: dict):
@@ -277,8 +337,9 @@ def check_docs(ep: dict, state: dict, defaults: dict):
         resp = http_get(url, timeout=timeout,
                         min_interval_s=ep.get("rate_limit_s",
                                             defaults.get("min_interval_s", DEFAULT_MIN_INTERVAL_S)))
-        digest = hashlib.sha256(
-            _normalize_docs_html(_content_bytes(resp))).hexdigest()
+        html = getattr(resp, "text", "") or ""
+        visible = _visible_text(html)
+        digest = _docs_fingerprint(html)
         result["sha256"] = digest
         result["deprecation_headers"] = _deprecation_headers(resp)
         ep_state = state.setdefault("endpoints", {}).setdefault(ep["id"], {})
@@ -287,18 +348,23 @@ def check_docs(ep: dict, state: dict, defaults: dict):
             ep_state["docs_hash"] = digest  # first sighting: baseline, no alert
         elif prev != digest:
             result["changed"] = True
-            text = (getattr(resp, "text", "") or "").lower()
-            hits = sorted({kw for kw in DEPRECATION_KEYWORDS if kw in text})
+            hits = _keyword_hits(visible)
             result["keyword_hits"] = hits
+            excerpt = visible[:500]
+            result["excerpt_before"] = ep_state.get("docs_excerpt", "")
+            result["excerpt_after"] = excerpt
+            ep_state["docs_excerpt"] = excerpt
             ep_state["docs_hash"] = digest
             ep_state["docs_last_changed"] = _now_iso()
+            snippet = excerpt[:140].replace("\n", " ")
             if hits:
                 alerts.append(
                     f"[docs] {ep['id']}: docs changed at {url} "
-                    f"(keywords: {', '.join(hits)})")
+                    f"(keywords: {', '.join(hits)}) :: {snippet}")
             else:
                 alerts.append(
-                    f"[docs] {ep['id']}: docs content changed at {url} (hash mismatch)")
+                    f"[docs] {ep['id']}: docs content changed at {url} "
+                    f"(hash mismatch) :: {snippet}")
         result["_resp"] = resp  # internal: feeds check 4; stripped before reporting
     except Exception as exc:
         result["ok"] = False

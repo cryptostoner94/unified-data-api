@@ -148,7 +148,7 @@ def test_registry_spec_base_urls_pinned():
     assert by_id["kraken-ws-v2"]["base_url"] == "wss://ws.kraken.com/v2"
     assert by_id["flashbots-relay"]["base_url"] == "https://boost-relay.flashbots.net"
     assert by_id["ultrasound-relay"]["base_url"] == "https://relay.ultrasound.money"
-    assert by_id["bloxroute-relay"]["base_url"] == "https://bloxroute.max-profit.blxrbdn.com"
+    assert by_id["bloxroute-relay"]["base_url"] == "https://bloxroute.regulated.blxrbdn.com"
     assert by_id["blockchain-info-ws"]["base_url"] == "wss://ws.blockchain.info/inv"
     assert by_id["sec-edgar"]["health_check"]["url"] == "https://www.sec.gov/files/company_tickers.json"
     assert by_id["gleif"]["base_url"] == "https://api.gleif.org/api/v1"
@@ -249,7 +249,7 @@ def test_docs_change_flags_deprecation_keywords(stub):
 
 def test_docs_stable_hash_no_alert(stub):
     body = "<html>docs v1</html>"
-    digest = watcher.hashlib.sha256(body.encode()).hexdigest()
+    digest = watcher._docs_fingerprint(body)
     state = {"endpoints": {"svc-test": {"docs_hash": digest}}}
     stub.mapping["https://svc.example/docs"] = FakeResp(200, body)
     result, alerts = watcher.check_docs(make_ep(), state, DEFAULTS)
@@ -565,6 +565,65 @@ def test_tier0_flag_filters_to_tier0_only(tmp_path, stub, monkeypatch):
     assert code == 0
     assert [e["id"] for e in report["endpoints"]] == ["svc-a"]
     assert report["tier0_only"] is True
+
+
+def test_keyword_scan_ignores_script_and_style_content():
+    """'legacyPageName' in analytics JS must not flag deprecation."""
+    html = """
+    <html><head><script>var digitalData={"page":{"legacyPageName":"x"}};</script>
+    <style>.uscb-tag__migration{color:red}</style></head>
+    <body><p>Current API documentation.</p></body></html>
+    """
+    assert watcher._keyword_hits(watcher._visible_text(html)) == []
+
+
+def test_keyword_scan_matches_real_deprecation_prose():
+    html = """
+    <html><body><p>This legacy endpoint is no longer supported.
+    Please migrate to v2 before the sunset date.</p></body></html>
+    """
+    hits = watcher._keyword_hits(watcher._visible_text(html))
+    assert hits == ["legacy", "migrat", "no longer", "sunset"]
+
+
+def test_keyword_scan_word_boundaries():
+    """'removed' must not match inside 'unremoved'; case-insensitive."""
+    html = "<html><body><p>Data DEPRECATED as of 2026.</p></body></html>"
+    assert watcher._keyword_hits(watcher._visible_text(html)) == ["deprecat"]
+    html2 = "<html><body><p>The unremoved entries remain.</p></body></html>"
+    assert watcher._keyword_hits(watcher._visible_text(html2)) == []
+
+
+def test_fingerprint_ignores_cfemail_and_scripts():
+    a = ('<html><head><script>window.__CF$cv$params={s:"abc123"}</script></head>'
+         '<body><p>Contact <span class="__cf_email__" data-cfemail="0e6d6b60">[email]</span></p></body></html>')
+    b = ('<html><head><script>window.__CF$cv$params={s:"def456"}</script></head>'
+         '<body><p>Contact <span class="__cf_email__" data-cfemail="4b282e25">[email]</span></p></body></html>')
+    assert watcher._docs_fingerprint(a) == watcher._docs_fingerprint(b)
+
+
+def test_fingerprint_ignores_uspto_request_id():
+    a = "register for an API key. [000001a003b8b318-6916e53]"
+    b = "register for an API key. [000001a003b8b318-6916e5f]"
+    assert watcher._docs_fingerprint(a) == watcher._docs_fingerprint(b)
+
+
+def test_fingerprint_detects_prose_change():
+    assert watcher._docs_fingerprint("<html><body><p>v1 docs</p></body></html>") != \
+        watcher._docs_fingerprint("<html><body><p>v2 docs</p></body></html>")
+
+
+def test_docs_change_records_excerpts(stub):
+    ep = make_ep()
+    state = {"endpoints": {"svc-test": {"docs_hash": "0" * 64,
+                                       "docs_excerpt": "old docs text"}}}
+    stub.mapping["https://svc.example/docs"] = FakeResp(
+        200, "<html><body><p>new docs text here</p></body></html>")
+    result, alerts = watcher.check_docs(ep, state, DEFAULTS)
+    assert result["changed"]
+    assert result["excerpt_before"] == "old docs text"
+    assert "new docs text here" in result["excerpt_after"]
+    assert any("new docs text here" in a for a in alerts)
 
 
 def test_main_validate_only(tmp_path, capsys):

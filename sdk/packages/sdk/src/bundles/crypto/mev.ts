@@ -25,7 +25,7 @@ export const MEV_BUNDLE_ID = "crypto.mev";
 export const RELAYS = {
   flashbots: "https://boost-relay.flashbots.net",
   ultrasound: "https://relay.ultrasound.money",
-  bloxroute: "https://bloxroute.max-profit.blxrbdn.com",
+  bloxroute: "https://bloxroute.regulated.blxrbdn.com",
 } as const;
 
 export interface MevBundleOptions extends BundleSharedOptions {
