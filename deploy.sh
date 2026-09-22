@@ -7,7 +7,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/cryptostoner94/unified-data-api/main/deploy.sh | sudo bash
 #
-# Optional: export NPM_TOKEN=<npm-token> to also publish @unified-data/sdk
+# Optional: export NPM_TOKEN=<npm-token> to also publish @cryptostoner/sdk
 # to the npm registry during deploy. The token is read from the environment
 # only, used once via a temp file, and never written to disk permanently.
 #
@@ -221,7 +221,7 @@ systemctl enable --now unified-docs-watcher-tier0.timer
 
 # ---------------------------------------------------------- optional npm publish
 if [ -n "${NPM_TOKEN:-}" ]; then
-  log "NPM_TOKEN set — publishing @unified-data/sdk..."
+  log "NPM_TOKEN set — publishing @cryptostoner/sdk..."
   NPMRC_TMP="$(mktemp)"
   printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$NPMRC_TMP"
   ( cd "$REPO_DIR/sdk/packages/sdk" && npm publish --userconfig "$NPMRC_TMP" --registry https://registry.npmjs.org/ )

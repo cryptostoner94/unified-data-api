@@ -15,7 +15,7 @@ our infrastructure.
 
 | Directory | What it is |
 |---|---|
-| [`sdk/`](sdk/) | `@unified-data/sdk` — TypeScript monorepo: core transport, normalized schemas, freshness labels (`LIVE`/`CACHED`/`ESTIMATE`), `StaleData`/`maxAge`, license + heartbeat client, feed adapters, Phase-1 bundles |
+| [`sdk/`](sdk/) | `@cryptostoner/sdk` — TypeScript monorepo: core transport, normalized schemas, freshness labels (`LIVE`/`CACHED`/`ESTIMATE`), `StaleData`/`maxAge`, license + heartbeat client, feed adapters, Phase-1 bundles |
 | [`backend/`](backend/) | FastAPI licensing/metering server: `POST /v1/license/verify`, `POST /v1/heartbeat`, x402 metering stub, tier config; Dockerfile + docker-compose |
 | [`docs-watcher/`](docs-watcher/) | Scheduled upstream monitor: liveness, docs-hash changes, schema drift, deprecation headers, feed staleness — 24-endpoint Phase-1 registry |
 | [`landing/`](landing/) | Single-page marketing site (no build step) |
@@ -30,11 +30,11 @@ Later phases (travel, weather, maps, news, sports) are roadmap — see the desig
 ## Quickstart
 
 ```bash
-npm install @unified-data/sdk   # publishing in progress — use source until then
+npm install @cryptostoner/sdk   # v0.1.0 published — or use source
 ```
 
 ```ts
-import { UnifiedData } from "@unified-data/sdk";
+import { UnifiedData } from "@cryptostoner/sdk";
 const sdk = new UnifiedData({ licenseKey: "YOUR-LICENSE-KEY" });
 const q = await sdk.crypto.cex.quote("BTCUSDT", { maxAge: 60 });
 console.log(q.price, q.freshness, q.source); // price is never shown as live when cached
@@ -54,7 +54,7 @@ curl -fsSL https://raw.githubusercontent.com/cryptostoner94/unified-data-api/mai
 
 Secrets come from `/opt/unified-data-api/.env`, created from
 `backend/.env.example` on first run only — fill in real values afterwards, then
-`systemctl restart unified-api`. To also publish `@unified-data/sdk` to npm
+`systemctl restart unified-api`. To also publish `@cryptostoner/sdk` to npm
 during deploy: `export NPM_TOKEN=<token>` before running (read from the
 environment only, never written to disk).
 
