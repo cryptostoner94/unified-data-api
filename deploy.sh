@@ -15,6 +15,17 @@
 # backend/.env.example ONLY if .env does not already exist. It never prints,
 # embeds, or overwrites secrets.
 #
+# TLS: /v1/license/verify receives the raw customer license key, so the API
+# listens on 127.0.0.1 only and nginx terminates TLS for $API_DOMAIN. The
+# certificate comes from Let's Encrypt, which needs a DNS A/AAAA record for
+# $API_DOMAIN that points at this server:
+#
+#   export API_DOMAIN=license.example.com     # default: license.unified-data.dev
+#   export ACME_EMAIL=you@example.com         # optional ACME registration email
+#
+# If the certificate cannot be issued, the deploy stops and the API stays down
+# rather than accepting license keys in cleartext.
+#
 set -euo pipefail
 
 REPO_URL="https://github.com/cryptostoner94/unified-data-api.git"
@@ -23,6 +34,9 @@ ENV_FILE="$REPO_DIR/.env"
 VENV="$REPO_DIR/.venv"
 API_PORT="8000"
 LANDING_PORT="8080"
+API_DOMAIN="${API_DOMAIN:-license.unified-data.dev}"
+ACME_EMAIL="${ACME_EMAIL:-}"
+ACME_WEBROOT="/var/www/html"
 
 log()  { echo "[deploy] $*"; }
 warn() { echo "[deploy][WARN] $*" >&2; }
@@ -36,7 +50,8 @@ fi
 # ------------------------------------------------------- system dependencies
 log "Installing system dependencies..."
 apt-get update -qq
-apt-get install -y -qq curl git python3 python3-venv python3-pip ca-certificates > /dev/null
+apt-get install -y -qq curl git python3 python3-venv python3-pip ca-certificates \
+                        nginx certbot python3-certbot-nginx > /dev/null
 
 # ------------------------------------------------------------- Node.js >= 20
 need_node=0
@@ -119,7 +134,7 @@ After=network.target
 Type=simple
 WorkingDirectory=$REPO_DIR/backend
 EnvironmentFile=$ENV_FILE
-ExecStart=$VENV/bin/uvicorn app.main:app --host 0.0.0.0 --port $API_PORT
+ExecStart=$VENV/bin/uvicorn app.main:app --host 127.0.0.1 --port $API_PORT --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=5
 
@@ -177,9 +192,8 @@ WantedBy=timers.target
 EOF
 
 # ---------------------------------------------------------- landing page
-if command -v nginx >/dev/null 2>&1; then
-  log "nginx found — serving landing page via nginx on :$LANDING_PORT"
-  cat > /etc/nginx/sites-available/unified-landing <<EOF
+log "Serving landing page via nginx on :$LANDING_PORT"
+cat > /etc/nginx/sites-available/unified-landing <<EOF
 server {
     listen $LANDING_PORT;
     server_name _;
@@ -188,34 +202,89 @@ server {
     location / { try_files \$uri \$uri/ =404; }
 }
 EOF
-  ln -sf /etc/nginx/sites-available/unified-landing /etc/nginx/sites-enabled/unified-landing
-  nginx -t
-  systemctl reload nginx || systemctl restart nginx
-  systemctl disable --now unified-landing.service 2>/dev/null || true
-else
-  warn "nginx not present — using python http.server fallback on :$LANDING_PORT"
-  cat > /etc/systemd/system/unified-landing.service <<EOF
-[Unit]
-Description=Unified Data API landing page (static fallback)
-After=network.target
+ln -sf /etc/nginx/sites-available/unified-landing /etc/nginx/sites-enabled/unified-landing
+systemctl disable --now unified-landing.service 2>/dev/null || true
 
-[Service]
-Type=simple
-WorkingDirectory=$REPO_DIR/landing
-ExecStart=/usr/bin/python3 -m http.server $LANDING_PORT
-Restart=on-failure
-RestartSec=5
+# ---------------------------------------------------- TLS certificate for API
+mkdir -p "$ACME_WEBROOT"
 
-[Install]
-WantedBy=multi-user.target
+# Port 80 carries only the ACME challenge; every other path redirects to TLS.
+cat > /etc/nginx/sites-available/unified-api <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $API_DOMAIN;
+
+    location /.well-known/acme-challenge/ { root $ACME_WEBROOT; }
+    location / { return 301 https://\$host\$request_uri; }
+}
 EOF
-  systemctl enable --now unified-landing.service
+ln -sf /etc/nginx/sites-available/unified-api /etc/nginx/sites-enabled/unified-api
+nginx -t
+systemctl reload nginx || systemctl restart nginx
+
+certbot_args=(certonly --webroot -w "$ACME_WEBROOT" --non-interactive --agree-tos
+              --keep-until-expiring --deploy-hook "systemctl reload nginx"
+              -d "$API_DOMAIN")
+if [ -n "$ACME_EMAIL" ]; then
+  certbot_args+=(--email "$ACME_EMAIL")
+else
+  certbot_args+=(--register-unsafely-without-email)
 fi
+
+if ! certbot "${certbot_args[@]}"; then
+  warn "TLS certificate for $API_DOMAIN could not be issued."
+  warn "Add a DNS A/AAAA record for $API_DOMAIN that points at this server, then re-run this script."
+  warn "The API is stopped: it refuses to take license keys over cleartext."
+  systemctl stop unified-api.service 2>/dev/null || true
+  exit 1
+fi
+
+# ---------------------------------------------------------- nginx: API proxy
+log "Configuring nginx TLS reverse proxy for the licensing API on $API_DOMAIN"
+cat > /etc/nginx/sites-available/unified-api <<EOF
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $API_DOMAIN;
+
+    location /.well-known/acme-challenge/ { root $ACME_WEBROOT; }
+    location / { return 301 https://\$host\$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name $API_DOMAIN;
+
+    ssl_certificate     /etc/letsencrypt/live/$API_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$API_DOMAIN/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:$API_PORT;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 30s;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/unified-api /etc/nginx/sites-enabled/unified-api
+nginx -t
+systemctl reload nginx || systemctl restart nginx
 
 # ---------------------------------------------------------- enable all
 log "Enabling and starting services..."
 systemctl daemon-reload
-systemctl enable --now unified-api.service
+systemctl enable unified-api.service
+# A re-deploy must replace an already-running unit. `enable --now` leaves an
+# active service alone, so a server upgraded from the earlier deploy would keep
+# the old ExecStart and its 0.0.0.0:$API_PORT listener.
+systemctl restart unified-api.service
+if ss -H -ltn 2>/dev/null | grep -qE "0\.0\.0\.0:$API_PORT|\[::\]:$API_PORT"; then
+  warn "unified-api is listening on every interface (port $API_PORT) — stop it and check /etc/systemd/system/unified-api.service"
+fi
 systemctl enable --now unified-docs-watcher.timer
 systemctl enable --now unified-docs-watcher-tier0.timer
 
@@ -235,9 +304,22 @@ fi
 # ---------------------------------------------------------------- summary
 echo
 log "Deploy complete."
-log "  API backend : http://<server-ip>:$API_PORT  (service: unified-api)"
+log "  API backend : https://$API_DOMAIN  -> 127.0.0.1:$API_PORT  (service: unified-api)"
 log "  Landing page: http://<server-ip>:$LANDING_PORT"
 log "  Watcher     : daily full + hourly tier0 (timers active)"
 log "  Secrets     : $ENV_FILE  (fill in real values, then: systemctl restart unified-api)"
-log "  Health      : curl http://localhost:$API_PORT/v1/health"
+log "  Health      : curl https://$API_DOMAIN/v1/health"
+
+healthy=0
+for _attempt in 1 2 3 4 5; do
+  if curl -fsS --max-time 5 "https://$API_DOMAIN/v1/health" >/dev/null 2>&1; then
+    healthy=1
+    break
+  fi
+  sleep 2
+done
+if [ "$healthy" -ne 1 ]; then
+  warn "https://$API_DOMAIN/v1/health did not answer yet."
+  warn "Check: systemctl status unified-api; journalctl -u unified-api -n 50; nginx -t"
+fi
 systemctl --no-pager --type=service list-units 'unified-*' | grep -E 'unified-(api|landing)' || true

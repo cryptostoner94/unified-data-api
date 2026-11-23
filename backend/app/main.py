@@ -17,7 +17,7 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app import notices
@@ -65,12 +65,50 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = load_license_keys()
     usage = UsageStore(database_url=settings.database_url, sqlite_path=settings.sqlite_path)
 
+    # The OpenAPI routes stay off a public listener: they publish the full
+    # route schema of the licensing service. They are available in local dev
+    # only, next to the plaintext transport opt-in.
+    expose_docs = settings.allow_insecure_transport
     app = FastAPI(
         title="Unified Public-Data API — Licensing & Metering",
         version=APP_VERSION,
-        docs_url="/docs",
+        docs_url="/docs" if expose_docs else None,
         redoc_url=None,
+        openapi_url="/openapi.json" if expose_docs else None,
     )
+
+    # ------------------------------------------------------------- transport
+    def _is_tls(request: Request) -> bool:
+        """True when the request reached us over TLS.
+
+        uvicorn runs behind the local nginx proxy (loopback only) with
+        --proxy-headers, so it normally rewrites the scheme from
+        X-Forwarded-Proto before the app sees the request. The header is read
+        again here only when the connection comes from the loopback peer.
+        """
+        if request.url.scheme == "https":
+            return True
+        peer = request.client.host if request.client else ""
+        forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+        return forwarded == "https" and peer in {"127.0.0.1", "::1"}
+
+    def _require_tls(request: Request) -> None:
+        """Refuse a credential-bearing route outside TLS.
+
+        /v1/license/verify receives the raw license key, and the heartbeat hash
+        is the metering credential. Over plaintext both are readable by anyone
+        on the network path, so a non-dev deployment must fail closed here.
+        """
+        if settings.allow_insecure_transport or _is_tls(request):
+            return
+        log.warning("transport rejected: %s path=%s requires https", request.method, request.url.path)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "https_required",
+                "message": "License traffic must use HTTPS.",
+            },
+        )
 
     # ------------------------------------------------------------------ health
     @app.get("/v1/health", response_model=HealthResponse)
@@ -107,7 +145,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return None
 
     @app.post("/v1/license/verify", response_model=LicenseVerifyResponse)
-    def license_verify(body: LicenseVerifyRequest) -> LicenseVerifyResponse:
+    def license_verify(body: LicenseVerifyRequest, request: Request) -> LicenseVerifyResponse:
+        _require_tls(request)
         # Hash FIRST — the raw key must never reach a log line, store, or response.
         key_hash = sha256_hex(body.licenseKey)
         fingerprint = key_hash[:12]
@@ -138,7 +177,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # ------------------------------------------------------------ heartbeat
     @app.post("/v1/heartbeat", response_model=HeartbeatResponse)
-    def heartbeat(body: HeartbeatRequest) -> HeartbeatResponse:
+    def heartbeat(body: HeartbeatRequest, request: Request) -> HeartbeatResponse:
+        _require_tls(request)
         key_hash = body.licenseKeyHash  # already a hash — safe to log
         fingerprint = key_hash[:12]
 

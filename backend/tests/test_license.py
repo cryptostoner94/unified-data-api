@@ -68,6 +68,7 @@ def test_malformed_license_keys_env_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setenv("LICENSE_KEYS", "{not valid json")
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "m.db"))
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("ALLOW_INSECURE_TRANSPORT", "1")  # local test client, plaintext
 
     from fastapi.testclient import TestClient
     import app.config as config_module
