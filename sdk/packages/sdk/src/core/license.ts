@@ -24,6 +24,10 @@ import type { FetchFn } from "./transport.js";
  */
 export const DEFAULT_LICENSE_BASE_URL = "https://license.unified-data.dev";
 
+/** Routes the SDK calls on the licensing backend. */
+export const LICENSE_VERIFY_PATH = "/v1/license/verify";
+export const HEARTBEAT_PATH = "/v1/heartbeat";
+
 export interface LicenseVerifyResult {
   valid: boolean;
   plan?: string;
@@ -131,7 +135,7 @@ export class LicenseClient {
       return this.cachedVerify.result;
     }
     try {
-      const res = await this.fetchFn(`${this.baseUrl}/v1/license/verify`, {
+      const res = await this.fetchFn(`${this.baseUrl}${LICENSE_VERIFY_PATH}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": `unified-data-sdk/${SDK_VERSION}` },
         body: JSON.stringify({ licenseKey: this.licenseKey, sdkVersion: SDK_VERSION, platform: this.platform }),
@@ -210,7 +214,7 @@ export class LicenseClient {
     this.heartbeatInFlight = true;
     try {
       const payload = await this.buildHeartbeatPayload();
-      const res = await this.fetchFn(`${this.baseUrl}/v1/license/heartbeat`, {
+      const res = await this.fetchFn(`${this.baseUrl}${HEARTBEAT_PATH}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": `unified-data-sdk/${SDK_VERSION}` },
         body: JSON.stringify(payload),

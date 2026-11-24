@@ -18,7 +18,7 @@ function licenseRoutes(overrides: { verify?: unknown; heartbeat?: unknown } = {}
       },
     },
     {
-      match: (url, init) => url.includes("/v1/license/heartbeat") && init?.method === "POST",
+      match: (url, init) => url.includes("/v1/heartbeat") && init?.method === "POST",
       respond: (_url, init) => {
         heartbeats.push(JSON.parse(String(init?.body)));
         return jsonResponse(overrides.heartbeat ?? { ok: true });
@@ -114,7 +114,7 @@ describe("LicenseClient", () => {
     const fetch = mockFetch([
       route("/v1/license/verify", () => jsonResponse({ valid: true }), "POST"),
       {
-        match: (url, init) => url.includes("/v1/license/heartbeat") && init?.method === "POST",
+        match: (url, init) => url.includes("/v1/heartbeat") && init?.method === "POST",
         respond: (_url, init) => {
           heartbeats.push(JSON.parse(String(init?.body)));
           return jsonResponse({ ok: true });
