@@ -147,11 +147,11 @@
     <span class="eyebrow">Get started</span>
     <h2>One install</h2>
     <div class="install-row">
-      <pre><code>npm install @unified-data/sdk</code></pre>
-      <span class="copy-hint">TypeScript-first. Python package <code>unified-data</code> mirrors the bundle surface.</span>
+      <pre><code>npm install @cryptostoner/sdk</code></pre>
+      <span class="copy-hint">TypeScript-first, Node 18+. Types shipped; no build step.</span>
     </div>
     <div class="honest-note">
-      Package publishing in progress &mdash; the package is not yet live on npm. Source available on GitHub: <a href="https://github.com/cryptostoner94/unified-data-api" style="color:var(--amber);">github.com/cryptostoner94/unified-data-api</a>.
+      v0.1.0 is published on npm. Initialization validates the key against a licensing server you deploy &mdash; the default host is a placeholder, so the sample passes <code>licenseBaseUrl</code>. Source: <a href="https://github.com/cryptostoner94/unified-data-api" style="color:var(--amber);">github.com/cryptostoner94/unified-data-api</a>.
     </div>
   </div>
 </section>
@@ -162,12 +162,12 @@
     <span class="eyebrow">Developer experience</span>
     <h2>Typed. Cached. Freshness-enforced.</h2>
     <p class="lede">Every result carries its source, fetch time, and a freshness label. Ask for a max age &mdash; if no result is fresh enough, the SDK tells you instead of silently returning stale data.</p>
-    <pre><code><span class="k">import</span> { UnifiedData } <span class="k">from</span> <span class="s">"@unified-data/sdk"</span>;
+    <pre><code><span class="k">import</span> { UnifiedDataSDK } <span class="k">from</span> <span class="s">"@cryptostoner/sdk"</span>;
 
-<span class="k">const</span> sdk = <span class="k">new</span> <span class="f">UnifiedData</span>({ licenseKey: process.env.UNIFIED_DATA_KEY });
+<span class="k">const</span> sdk = <span class="k">await</span> <span class="f">UnifiedDataSDK</span>.<span class="f">create</span>({ licenseKey: process.env.UNIFIED_DATA_KEY, licenseBaseUrl: <span class="s">"https://license.example.com"</span> });
 
 <span class="c">// Quote BTC/USDT, refusing anything older than 60 seconds</span>
-<span class="k">const</span> quote = <span class="k">await</span> sdk.crypto.cex.<span class="f">quote</span>(<span class="s">"BTCUSDT"</span>, { maxAge: <span class="n">60</span> });
+<span class="k">const</span> quote = <span class="k">await</span> sdk.crypto.cex.<span class="f">ticker</span>({ venue: <span class="s">"binance"</span>, symbol: <span class="s">"BTCUSDT"</span> }, { maxAge: <span class="n">60</span> });
 
 console.<span class="f">log</span>(quote.price);      <span class="c">// 97,412.55</span>
 console.<span class="f">log</span>(quote.source);     <span class="c">// "binance"</span>

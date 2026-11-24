@@ -34,11 +34,19 @@ npm install @cryptostoner/sdk   # v0.1.0 published — or use source
 ```
 
 ```ts
-import { UnifiedData } from "@cryptostoner/sdk";
-const sdk = new UnifiedData({ licenseKey: "YOUR-LICENSE-KEY" });
-const q = await sdk.crypto.cex.quote("BTCUSDT", { maxAge: 60 });
+import { UnifiedDataSDK } from "@cryptostoner/sdk";
+
+const sdk = await UnifiedDataSDK.create({
+  licenseKey: "YOUR-LICENSE-KEY",
+  licenseBaseUrl: "https://license.example.com", // your own deployment, see Deploy below
+});
+const q = await sdk.crypto.cex.ticker({ venue: "binance", symbol: "BTCUSDT" }, { maxAge: 60 });
 console.log(q.price, q.freshness, q.source); // price is never shown as live when cached
 ```
+
+`create()` validates the key against the licensing server and throws `LicenseInvalid`
+when none answers, so the snippet passes `licenseBaseUrl`. The default host is a
+placeholder that does not serve yet.
 
 ## Deploy (user's server)
 
