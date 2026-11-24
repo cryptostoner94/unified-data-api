@@ -1,16 +1,21 @@
-# Local / staging deploy: API + Postgres. SQLite is the default when
-# DATABASE_URL is unset — Postgres is optional.
+# Local deploy: API + Postgres. SQLite is the default when DATABASE_URL is
+# unset — Postgres is optional. The API is published on loopback only: this
+# stack is plaintext and must not be reachable from another host.
 services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
       # Uncomment to use Postgres instead of SQLite:
       # DATABASE_URL: postgresql://dataapi:${POSTGRES_PASSWORD}@db:5432/dataapi
       SQLITE_PATH: /srv/data-api/data/metering.db
+      # The published port is loopback-only plaintext, so the licensing routes
+      # need the dev opt-in. A public deployment goes through deploy.sh, which
+      # keeps uvicorn on loopback behind nginx TLS.
+      ALLOW_INSECURE_TRANSPORT: "1"
     volumes:
       - api-data:/srv/data-api/data
     depends_on:

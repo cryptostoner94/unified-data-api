@@ -172,6 +172,10 @@ def load_license_keys() -> dict[str, LicenseEntry]:
 
 
 # --- Runtime settings ----------------------------------------------------------
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass
 class Settings:
     database_url: str = ""                      # empty -> SQLite at SQLITE_PATH
@@ -179,6 +183,10 @@ class Settings:
     heartbeat_max_bundles: int = 50             # hard cap on bundleIds entries per heartbeat
     heartbeat_max_count_per_bundle: int = 10_000_000
     log_level: str = field(default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO"))
+    # Local development only. When false (the default) license traffic must
+    # arrive over TLS: the verify body carries the raw license key and the
+    # heartbeat hash is the metering credential.
+    allow_insecure_transport: bool = field(default_factory=lambda: _env_flag("ALLOW_INSECURE_TRANSPORT"))
 
 
 def get_settings() -> Settings:

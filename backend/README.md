@@ -30,10 +30,21 @@ pip install -r requirements.txt
 # Configure (fail-closed: missing/malformed LICENSE_KEYS -> every key invalid)
 cp .env.example .env   # then fill in LICENSE_KEYS in .env
 
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Interactive docs: `http://localhost:8000/docs`
+Interactive docs: `http://localhost:8000/docs` (local dev only — the docs and
+OpenAPI routes are served only when `ALLOW_INSECURE_TRANSPORT=1` is set).
+
+### Transport
+
+`/v1/license/verify` receives the raw license key, and the heartbeat hash is the
+metering credential. Both routes answer `403 {"error": "https_required"}` unless
+the request arrives over TLS (verified from the request scheme, or from
+`X-Forwarded-Proto: https` sent by the loopback proxy). The plaintext opt-in
+`ALLOW_INSECURE_TRANSPORT=1` exists for local development only. In production
+`deploy.sh` binds uvicorn to `127.0.0.1` and terminates TLS at nginx for
+`$API_DOMAIN`.
 
 ## API
 
@@ -83,8 +94,11 @@ cp .env.example .env   # fill in LICENSE_KEYS (+ POSTGRES_PASSWORD if using Post
 docker compose up --build
 ```
 
-API on `http://localhost:8000`. SQLite persists in the `api-data` volume by default;
-uncomment `DATABASE_URL` in compose to switch to Postgres (set `POSTGRES_PASSWORD`).
+API on `http://localhost:8000`: compose publishes `127.0.0.1:8000` (loopback only)
+and sets `ALLOW_INSECURE_TRANSPORT=1` for this plaintext stack. Do not reach this
+stack from another host — run `deploy.sh` for a public deployment. SQLite persists
+in the `api-data` volume by default; uncomment `DATABASE_URL` in compose to switch
+to Postgres (set `POSTGRES_PASSWORD`).
 
 ## Tests
 

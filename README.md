@@ -46,9 +46,16 @@ One-shot, idempotent — run as root on the target Ubuntu server. It installs
 Node 20 (if missing), clones/pulls to `/opt/unified-data-api`, runs `npm ci`,
 builds, runs the full offline test suite, and installs + enables systemd units
 for the API backend, the docs-watcher (daily full + hourly Tier-0 timers), and
-the landing page (nginx if present, else a static fallback).
+the landing page.
+
+The API answers only over TLS: uvicorn listens on `127.0.0.1:8000` and nginx
+terminates TLS for `license.unified-data.dev` (override with `API_DOMAIN`). The
+deploy obtains a Let's Encrypt certificate, so the name must already resolve to
+the server. If the certificate cannot be issued, the deploy stops and the API
+stays down instead of accepting license keys in cleartext.
 
 ```bash
+# optional: export API_DOMAIN=license.example.com ACME_EMAIL=you@example.com
 curl -fsSL https://raw.githubusercontent.com/cryptostoner94/unified-data-api/main/deploy.sh | sudo bash
 ```
 

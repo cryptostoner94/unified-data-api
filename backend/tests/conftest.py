@@ -52,6 +52,9 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setenv("QUOTA_BUILDER", "500")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    # Tests drive the app over plaintext TestClient; that is the local dev
+    # transport, so the TLS guard would reject every credential route.
+    monkeypatch.setenv("ALLOW_INSECURE_TRANSPORT", "1")
     return db_path
 
 
