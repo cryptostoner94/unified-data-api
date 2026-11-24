@@ -11,7 +11,7 @@
  * roadmap (see README).
  */
 import { MemoryCache } from "./core/cache.js";
-import { LicenseClient, DEFAULT_LICENSE_BASE_URL } from "./core/license.js";
+import { LicenseClient, DEFAULT_LICENSE_BASE_URL, HEARTBEAT_PATH, LICENSE_VERIFY_PATH } from "./core/license.js";
 import type { FetchFn } from "./core/transport.js";
 import { SDK_VERSION } from "./version.js";
 import { MevBundle, type MevBundleOptions } from "./bundles/crypto/mev.js";
@@ -109,7 +109,7 @@ export class UnifiedDataSDK {
 // Re-exports: types, core, adapters, bundles
 // ---------------------------------------------------------------------------
 
-export { SDK_VERSION, DEFAULT_LICENSE_BASE_URL };
+export { SDK_VERSION, DEFAULT_LICENSE_BASE_URL, HEARTBEAT_PATH, LICENSE_VERIFY_PATH };
 export * from "./types/index.js";
 export * from "./core/index.js";
 export * from "./adapters/index.js";

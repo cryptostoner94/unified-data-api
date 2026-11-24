@@ -52,6 +52,7 @@ the request arrives over TLS (verified from the request scheme, or from
 |---|---|---|
 | `POST /v1/license/verify` | `{ "licenseKey": "..." }` | `{ valid, plan, bundles[], expiresAt, notice? }` |
 | `POST /v1/heartbeat` | `{ licenseKeyHash, bundleIds: {bundle: count}, sdkVersion, platform }` | `{ ok, downgrade?, notice? }` |
+| `POST /v1/license/heartbeat` | same as `/v1/heartbeat` — legacy alias for already-installed SDK 0.1.x clients (hidden from the OpenAPI schema) |
 | `GET /v1/health` | — | `{ status, version, time }` |
 | `GET /v1/notice` | — | `{ notices: [...] }` (server→SDK notices) |
 | `GET /v1/tiers` | — | pricing tiers (prices: **TBD — set by owner**) |

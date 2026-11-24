@@ -177,6 +177,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # ------------------------------------------------------------ heartbeat
     @app.post("/v1/heartbeat", response_model=HeartbeatResponse)
+    @app.post("/v1/license/heartbeat", response_model=HeartbeatResponse, include_in_schema=False)
     def heartbeat(body: HeartbeatRequest, request: Request) -> HeartbeatResponse:
         _require_tls(request)
         key_hash = body.licenseKeyHash  # already a hash — safe to log

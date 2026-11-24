@@ -6,7 +6,7 @@ import { jsonResponse, mockFetch, route } from "./helpers.js";
 function sdkFetch() {
   return mockFetch([
     route("/v1/license/verify", () => jsonResponse({ valid: true, plan: "pro" }), "POST"),
-    route("/v1/license/heartbeat", () => jsonResponse({ ok: true }), "POST"),
+    route("/v1/heartbeat", () => jsonResponse({ ok: true }), "POST"),
     route("data-api.binance.vision/api/v3/klines", () =>
       jsonResponse([[1_757_000_000_000, "100", "105", "99", "104", "10", 1_757_003_599_999]]),
     ),
@@ -55,7 +55,7 @@ describe("UnifiedDataSDK", () => {
     expect(sdk.license.pendingCounts()).toEqual({ "crypto.cex": 1, "enterprise.filings": 1 });
     await sdk.shutdown();
     sdks = [];
-    const beats = fetch.captured.filter((c) => c.url.includes("/v1/license/heartbeat"));
+    const beats = fetch.captured.filter((c) => c.url.includes("/v1/heartbeat"));
     expect(beats.length).toBeGreaterThanOrEqual(1);
     const payload = JSON.parse(beats[beats.length - 1].bodyText!);
     expect(payload.bundleIds).toEqual({ "crypto.cex": 1, "enterprise.filings": 1 });
